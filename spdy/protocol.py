@@ -28,7 +28,7 @@ class Frame(object):
 	pass
 
 class DataFrame(Frame):
-	def __init__(self, stream, data=None):
+	def __init__(self, stream, data=None, raw=None):
 		self.is_control = False
 		self.stream_id = stream_id
 		self._raw = None
@@ -37,7 +37,7 @@ class DataFrame(Frame):
 	@property
 	def data(self):
 		if not self._data:
-			self._parse()
+			self._decompress_raw()
 		return self._data
 
 	@data.setter
@@ -48,7 +48,7 @@ class DataFrame(Frame):
 	def data(self):
 		del self._data
 	
-	def _parse(self):
+	def _decompress_raw(self):
 		raise NotImplementedError()
 
 class ControlFrame(Frame):
@@ -66,40 +66,43 @@ class ControlFrame(Frame):
 	def _encode(self):
 		raise NotImplementedError()
 
-class HeaderBlock:
-	def __init__(self, headers=None):
-		self._headers = headers
+#class HeaderBlock:
+#	def __init__(self, headers):
+#		self._headers = headers
+#
+#	@property
+#	def headers(self):
+#		if not self._headers:
+#			self._parse()
+#		return self._headers
+#
+#	@headers.setter
+#	def headers(self, headers):
+#		self._headers = headers
+#	
+#	@headers.deleter
+#	def headers(self):
+#		del self._headers
 
-	@property
-	def headers(self):
-		if not self._headers:
-			self._parse()
-		return self._headers
-
-	@headers.setter
-	def headers(self, headers):
-		self._headers = headers
-	
-	@headers.deleter
-	def headers(self):
-		del self._headers
-
-class SynStream(ControlFrame, HeaderBlock):
+class SynStream(ControlFrame):
 	def __init__(self, version, stream_id, headers=None):
-		ControlFrame.__init__(self, version, SYN_STREAM)
-		HeaderBlock.__init__(self, headers)
+#		ControlFrame.__init__(self, version, SYN_STREAM)
+#		HeaderBlock.__init__(self, headers)
+		super(SynStream, self).__init__(version, SYN_STREAM)
 		self.stream_id = stream_id
 
-class SynReply(ControlFrame, HeaderBlock):
+class SynReply(ControlFrame):
 	def __init__(self, version, stream_id, headers=None):
-		ControlFrame.__init__(self, version, SYN_REPLY)
-		HeaderBlock.__init__(self, headers)
+#		ControlFrame.__init__(self, version, SYN_REPLY)
+#		HeaderBlock.__init__(self, headers)
+		super(SynReply, self).__init__(version, SYN_HEADERS)
 		self.stream_id = stream_id
 	
-class Headers(ControlFrame, HeaderBlock):
+class Headers(ControlFrame):
 	def __init__(self, version, stream_id, headers=None):
-		ControlFrame.__init__(self, version, HEADERS)
-		HeaderBlock.__init__(self, headers)
+#		ControlFrame.__init__(self, version, HEADERS)
+#		HeaderBlock.__init__(self, headers)
+		super(Headers, self).__init__(version, HEADERS)
 		self.stream_id = stream_id
 
 class RstStream(ControlFrame):
@@ -107,6 +110,11 @@ class RstStream(ControlFrame):
 		super(RstStream, self).__init__(version, RST_STREAM)
 		self.stream_id = stream_id
 		self.error_code = error_code
+
+def ignore_first_bit(n, l):
+	return n & int('0' + ''.join(['1' for p in range(l-1)]), 2)
+
+
 
 def parse_frame(chunk):
 	if not isinstance(chunk, bytes):
@@ -119,9 +127,8 @@ def parse_frame(chunk):
 	control_frame = (chunk[0] & 0b10000000 == 128)
 
 	if control_frame:
-		#second byte (and rest of first): spdy version
-		#TODO account for spdy versions > 128
-		spdy_version = chunk[1]
+		#second byte (and rest of first, after the first bit): spdy version
+		spdy_version = ignore_first_bit(int.from_bytes(chunk[0:2], 'big'), 16)
 
 		#third and fourth byte: frame type
 		ft = int.from_bytes(chunk[2:4], 'big')
@@ -132,15 +139,26 @@ def parse_frame(chunk):
 		#fifth byte: flags
 		flags = chunk[4]
 
-		#sixth and through eighth bytes: length
+		#sixth, seventh and eighth bytes: length
 		length = int.from_bytes(chunk[5:8], 'big')
-		if len(chunk) < 8 + length:
+		frame_length
+		if len(chunk) < frame_length:
 			return (0, None)
 
 		print(spdy_version, frame_type, flags, length) 
 
 		if frame_type == SYN_STREAM:
-			raise NotImplementedError()
+			#ninth through twelvth bytes, except for the first bit: stream_id
+			stream_id = ignore_first_bit(int.from_bytes(chunk[8:12], 'big'), 32)
+			
+			#thirteenth through sixteenth bytes, except for the first bit: associated stream_id
+			assoc_stream_id = ignore_first_bit(int.from_bytes(chunk[12:16], 'big'), 32)
+			
+			#first 2 bits of seventeenth byte: priority
+			priority = chunk[16] & 0b1100000000000000
+
+			#ignore the rest of the seventeenth and the whole eighteenth byte. the rest is a header block
+			header_chunk = parse_header_chunk(chunk[18:length+8])
 		elif frame_type == SYN_REPLY:
 			raise NotImplementedError()
 		elif frame_type == RST_STREAM:
@@ -155,11 +173,23 @@ def parse_frame(chunk):
 			raise NotImplementedError()
 		elif frame_type == HEADERS:
 			raise NotImplementedError()
+		else:
+			raise NotImplementedError()
 
 	else: #data frame
+		#second, third and fourth bytes (and rest of first): stream_id
+		#TODO: account for stream_ids > 32767
 		stream_id = int.from_bytes(chunk[1:4], 'big')
+		
+		#fifth byte: flags
 		flags = chunk[4]
+
+		#sixth, seventh and eight bytes: length
 		length = int.from_bytes(chunk[5:8], 'big')
+		if len(chunk) < 8 + length:
+			return (0, None)
+
+		
 
 	return (frame, 8 + length)
 
