@@ -20,6 +20,20 @@ FRAME_TYPES = {
 	8: HEADERS
 }
 
+#HEADER_ZLIB_DICT = "optionsgetheadpostputdeletetraceacceptaccept-charsetaccept-encodingaccept-"
+#	"languageauthorizationexpectfromhostif-modified-sinceif-matchif-none-matchi"
+#	"f-rangeif-unmodifiedsincemax-forwardsproxy-authorizationrangerefererteuser"
+#	"-agent10010120020120220320420520630030130230330430530630740040140240340440"
+#	"5406407408409410411412413414415416417500501502503504505accept-rangesageeta"
+#	"glocationproxy-authenticatepublicretry-afterservervarywarningwww-authentic"
+#	"ateallowcontent-basecontent-encodingcache-controlconnectiondatetrailertran"
+#	"sfer-encodingupgradeviawarningcontent-languagecontent-lengthcontent-locati"
+#	"oncontent-md5content-rangecontent-typeetagexpireslast-modifiedset-cookieMo"
+#	"ndayTuesdayWednesdayThursdayFridaySaturdaySundayJanFebMarAprMayJunJulAugSe"
+#	"pOctNovDecchunkedtext/htmlimage/pngimage/jpgimage/gifapplication/xmlapplic"
+#	"ation/xhtmltext/plainpublicmax-agecharset=iso-8859-1utf-8gzipdeflateHTTP/1"
+#	".1statusversionurl"
+
 class SpdyProtocolError(Exception):
 	pass
 
@@ -114,7 +128,8 @@ class RstStream(ControlFrame):
 def ignore_first_bit(n, l):
 	return n & int('0' + ''.join(['1' for p in range(l-1)]), 2)
 
-
+def parse_header_chunk(chunk):
+	pass
 
 def parse_frame(chunk):
 	if not isinstance(chunk, bytes):
@@ -141,7 +156,7 @@ def parse_frame(chunk):
 
 		#sixth, seventh and eighth bytes: length
 		length = int.from_bytes(chunk[5:8], 'big')
-		frame_length
+		frame_length = length + 8
 		if len(chunk) < frame_length:
 			return (0, None)
 
