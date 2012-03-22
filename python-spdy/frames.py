@@ -1,21 +1,21 @@
-SYN_STREAM = 'SYN_STREAM'
-SYN_REPLY = 'SYN_REPLY'
-RST_STREAM = 'RST_STREAM'
-SETTINGS = 'SETTINGS'
-NOOP = 'NOOP'
-PING = 'PING'
-GOAWAY = 'GOAWAY'
-HEADERS = 'HEADERS'
+SYN_STREAM = 1
+SYN_REPLY = 2
+RST_STREAM = 3
+SETTINGS = 4
+NOOP = 5
+PING = 6
+GOAWAY = 7
+HEADERS = 8
 
 FRAME_TYPES = {
-	1: SYN_STREAM,
-	2: SYN_REPLY,
-	3: RST_STREAM,
-	4: SETTINGS,
-	5: NOOP,
-	6: PING,
-	7: GOAWAY,
-	8: HEADERS
+	1: 'SYN_STREAM',
+	2: 'SYN_REPLY',
+	3: 'RST_STREAM',
+	4: 'SETTINGS',
+	5: 'NOOP',
+	6: 'PING',
+	7: 'GOAWAY',
+	8: 'HEADERS'
 }
 
 
@@ -40,13 +40,15 @@ class ControlFrame(Frame):
 		self.frame_type = frame_type
 
 	def __repr__(self):
-		return self.frame_type
+		return FRAME_TYPES[self.frame_type]
 
 class SynStream(ControlFrame):
 	def __init__(self, version, stream_id, headers, fin=True, unidirectional=False):
 		super(SynStream, self).__init__(version, SYN_STREAM)
 		self.stream_id = stream_id
 		self.headers = headers
+		self.fin = fin
+		self.unidirectional = unidirectional
 
 class SynReply(ControlFrame):
 	def __init__(self, version, stream_id, headers, fin=True):
