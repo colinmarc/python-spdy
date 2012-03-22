@@ -27,34 +27,10 @@ class Frame(object):
 	pass
 
 class DataFrame(Frame):
-	def __init__(self, stream, data=None, raw=None):
+	def __init__(self, stream_id, data=None):
 		self.is_control = False
 		self.stream_id = stream_id
-		self._raw = None
-		self._data = data
-
-	def __repr__(self):
-		if self._data:
-			return 'DATA ({1})'.format(len(self._data))
-		else:
-			return 'DATA (uncompressed)'
-
-	@property
-	def data(self):
-		if not self._data:
-			self._decompress_raw()
-		return self._data
-
-	@data.setter
-	def data(self, data):
-		self._data = data
-
-	@data.deleter
-	def data(self):
-		del self._data
-	
-	def _decompress_raw(self):
-		raise NotImplementedError()
+		self.data = data
 
 class ControlFrame(Frame):
 	def __init__(self, version, frame_type):
