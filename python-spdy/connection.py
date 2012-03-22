@@ -1,9 +1,69 @@
 from frames import *
+from spdy._zlib_stream import Inflater, Deflater
 
-def ignore_first_bit(n):
+HEADER_ZLIB_DICT = \
+	b"optionsgetheadpostputdeletetraceacceptaccept-charsetaccept-encodingaccept-" \
+	b"languageauthorizationexpectfromhostif-modified-sinceif-matchif-none-matchi" \
+	b"f-rangeif-unmodifiedsincemax-forwardsproxy-authorizationrangerefererteuser" \
+	b"-agent10010120020120220320420520630030130230330430530630740040140240340440" \
+	b"5406407408409410411412413414415416417500501502503504505accept-rangesageeta" \
+	b"glocationproxy-authenticatepublicretry-afterservervarywarningwww-authentic" \
+	b"ateallowcontent-basecontent-encodingcache-controlconnectiondatetrailertran" \
+	b"sfer-encodingupgradeviawarningcontent-languagecontent-lengthcontent-locati" \
+	b"oncontent-md5content-rangecontent-typeetagexpireslast-modifiedset-cookieMo" \
+	b"ndayTuesdayWednesdayThursdayFridaySaturdaySundayJanFebMarAprMayJunJulAugSe" \
+	b"pOctNovDecchunkedtext/htmlimage/pngimage/jpgimage/gifapplication/xmlapplic" \
+	b"ation/xhtmltext/plainpublicmax-agecharset=iso-8859-1utf-8gzipdeflateHTTP/1" \
+	b".1statusversionurl"
+
+SPDY_2 = 'SPDY_2'
+VERSIONS = {
+	2: SPDY_2
+}
+
+SERVER = 'SERVER'
+CLIENT = 'CLIENT'
+
+def _ignore_first_bit(n):
 	return n << 1 >> 1 #discard the first bit
 
-def parse_header_chunk(chunk, zlib_stream):
+class Connection:
+	def __init__(self, side, version=2):
+		if side not in [SERVER, CLIENT]:
+			raise TypeError("side must be SERVER or CLIENT")
+
+		version = VERSIONS.get(version, False)
+		if not version:
+			raise NotImplementedError()
+		self.version = version
+
+		self.deflater = Deflater(dictionary=ZLIB_HEADER_DICT)
+		self.inflater = Inflater(dictionary=ZLIB_HEADER_DICT)
+		self.frame_queue = []
+		self.input_buffer = b''
+
+	def incoming(chunk):
+		self.input_buffer += chunk
+
+	def get_frame():
+		bytes_parsed, frame = self._parse_frame(self.input_buffer)
+		if bytes_parsed:
+			self.input_buffer = self.input_buffer[bytes_parsed:]
+		return frame
+
+	def put_frame(frame):
+		if not isinstance(frame, Frame):
+			raise TypeError("frame must be a valid Frame object")
+		self.frame_queue.append(frame)
+
+	def outgoing():
+		out = bytearray()
+		while len(self.frame_queue) > 0:
+			frame = self.frame_queue.pop(0)
+			out.extend(self._encode_frame(frame))
+		return out
+
+def _parse_header_chunk(chunk, zlib_stream):
 	num_values = int.from_bytes(chunk[0:2], 'big')	
 
 def parse_frame(chunk):
