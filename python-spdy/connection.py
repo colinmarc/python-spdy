@@ -1,4 +1,4 @@
-from frames import *
+from spdy.frames import *
 from spdy._zlib_stream import Inflater, Deflater
 
 HEADER_ZLIB_DICT = \
@@ -24,39 +24,40 @@ VERSIONS = {
 SERVER = 'SERVER'
 CLIENT = 'CLIENT'
 
-def _ignore_first_bit(n):
-	return n << 1 >> 1 #discard the first bit
+def _ignore_first_bit(n, l):
+	return n & int('0' + ''.join(['1' for p in range(l-1)]), 2)
 
 class Connection:
 	def __init__(self, side, version=2):
 		if side not in [SERVER, CLIENT]:
 			raise TypeError("side must be SERVER or CLIENT")
 
-		version = VERSIONS.get(version, False)
+		long_version = VERSIONS.get(version, False)
 		if not version:
 			raise NotImplementedError()
 		self.version = version
+		self.long_version = long_version
 
-		self.deflater = Deflater(dictionary=ZLIB_HEADER_DICT)
-		self.inflater = Inflater(dictionary=ZLIB_HEADER_DICT)
+		self.deflater = Deflater(dictionary=HEADER_ZLIB_DICT)
+		self.inflater = Inflater(dictionary=HEADER_ZLIB_DICT)
 		self.frame_queue = []
 		self.input_buffer = b''
 
-	def incoming(chunk):
+	def incoming(self, chunk):
 		self.input_buffer += chunk
 
-	def get_frame():
+	def get_frame(self):
 		bytes_parsed, frame = self._parse_frame(self.input_buffer)
 		if bytes_parsed:
 			self.input_buffer = self.input_buffer[bytes_parsed:]
 		return frame
 
-	def put_frame(frame):
+	def put_frame(self, frame):
 		if not isinstance(frame, Frame):
 			raise TypeError("frame must be a valid Frame object")
 		self.frame_queue.append(frame)
 
-	def outgoing():
+	def outgoing(self, frame):
 		out = bytearray()
 		while len(self.frame_queue) > 0:
 			frame = self.frame_queue.pop(0)
@@ -64,7 +65,7 @@ class Connection:
 		return out
 
 	def _parse_header_chunk(self, compressed_data):
-		chunk = Inflater.decompress(compressed_data)
+		chunk = self.inflater.decompress(compressed_data)
 		headers = {}
 
 		#first two bytes: number of pairs
@@ -111,7 +112,7 @@ class Connection:
 
 		if control_frame:
 			#second byte (and rest of first, after the first bit): spdy version
-			spdy_version = ignore_first_bit(int.from_bytes(chunk[0:2], 'big'), 16)
+			spdy_version = _ignore_first_bit(int.from_bytes(chunk[0:2], 'big'), 16)
 
 			#third and fourth byte: frame type
 			ft = int.from_bytes(chunk[2:4], 'big')
@@ -128,16 +129,17 @@ class Connection:
 			if len(chunk) < frame_length:
 				return (0, None)
 
-			print(spdy_version, frame_type, flags, length) 
+			print(spdy_version, self.version, frame_type, flags, length) 
+
 			if spdy_version != self.version:
 				raise SpdyProtocolError("incorrect SPDY version")
 
 			if frame_type == SYN_STREAM:
 				#ninth through twelvth bytes, except for the first bit: stream_id
-				stream_id = ignore_first_bit(int.from_bytes(chunk[8:12], 'big'), 32)
+				stream_id = _ignore_first_bit(int.from_bytes(chunk[8:12], 'big'), 32)
 				
 				#thirteenth through sixteenth bytes, except for the first bit: associated stream_id
-				assoc_stream_id = ignore_first_bit(int.from_bytes(chunk[12:16], 'big'), 32)
+				assoc_stream_id = _ignore_first_bit(int.from_bytes(chunk[12:16], 'big'), 32)
 				
 				#first 2 bits of seventeenth byte: priority
 				priority = chunk[16] & 0b1100000000000000
