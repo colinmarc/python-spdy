@@ -18,7 +18,6 @@ FRAME_TYPES = {
 	8: 'HEADERS'
 }
 
-
 class SpdyProtocolError(Exception):
 	pass
 
@@ -52,8 +51,10 @@ class SynStream(ControlFrame):
 
 class SynReply(ControlFrame):
 	def __init__(self, version, stream_id, headers, fin=True):
-		super(SynReply, self).__init__(version, SYN_HEADERS)
+		super(SynReply, self).__init__(version, SYN_REPLY)
 		self.stream_id = stream_id
+		self.headers = headers
+		self.fin = fin
 	
 class Headers(ControlFrame):
 	def __init__(self, version, stream_id, headers):

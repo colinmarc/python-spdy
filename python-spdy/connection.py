@@ -159,7 +159,16 @@ class Connection:
 				frame = SynStream(spdy_version, stream_id, headers, fin, unidirectional)
 
 			elif frame_type == SYN_REPLY:
-				raise NotImplementedError()
+				fin = (flags & FLAG_FIN == FLAG_FIN)
+
+				#first through fourth bytes, except for the first bit: stream_id
+				stream_id = int.from_bytes(_ignore_first_bit(data[0:4]), 'big')
+				
+				#ignore the fifth and sixth bytes (they are reserved)
+				#the rest is a header block
+				headers = self._parse_header_chunk(data[6:])
+				frame = SynReply(spdy_version, stream_id, headers, fin)
+
 			elif frame_type == RST_STREAM:
 				raise NotImplementedError()
 			elif frame_type == SETTINGS:
@@ -264,7 +273,20 @@ class Connection:
 				data.extend(self._encode_header_chunk(frame.headers))
 
 			elif frame.frame_type == SYN_REPLY:
-				raise NotImplementedError()
+				#set the flags
+				flags = 0
+				if frame.fin: flags |= FLAG_FIN
+				out[4] = flags
+
+				#first through fourth bytes, except for the first bit: stream_id
+				data.extend(frame.stream_id.to_bytes(4, 'big'))
+
+				#fifth and sixth bytes: reserved
+				data.extend(bytes(2))
+
+				#the rest is a header block
+				data.extend(self._encode_header_chunk(frame.headers))
+
 			elif frame.frame_type == RST_STREAM:
 				raise NotImplementedError()
 			elif frame.frame_type == SETTINGS:
