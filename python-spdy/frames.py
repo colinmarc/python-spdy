@@ -41,14 +41,6 @@ class ControlFrame(Frame):
 	def __repr__(self):
 		return self.frame_type
 
-	#abstract
-	def _parse(self):
-		raise NotImplementedError()
-
-	#abstract
-	def _encode(self):
-		raise NotImplementedError()
-
 class SynStream(ControlFrame):
 	def __init__(self, version, stream_id, headers):
 		super(SynStream, self).__init__(version, SYN_STREAM)

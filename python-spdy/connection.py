@@ -29,6 +29,25 @@ class Connection:
 		self.frame_queue = []
 		self.input_buffer = b''
 
+		if side == SERVER:
+			self._stream_id = 2
+			self._ping_id = 2
+		else:
+			self._stream_id = 1
+			self._ping_id = 1
+
+	@property
+	def next_stream_id(self):
+		sid = self._stream_id
+		self._stream_id += 2
+		return sid
+
+	@property
+	def next_ping_id(self):
+		pid = self._ping_id
+		self._ping_id += 2
+		return pid
+
 	def incoming(self, chunk):
 		self.input_buffer += chunk
 
