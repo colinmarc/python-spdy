@@ -63,10 +63,43 @@ class Connection:
 			out.extend(self._encode_frame(frame))
 		return out
 
-	def _parse_header_chunk(chunk, zlib_stream):
+	def _parse_header_chunk(compressed_data):
+		chunk = Inflater.decompress(compressed_data)
+		headers = {}
+
+		#first two bytes: number of pairs
 		num_values = int.from_bytes(chunk[0:2], 'big')	
 
-	def parse_frame(chunk):
+		#after that...
+		cursor = 0
+		for _ in range(num_values):
+			#two bytes: length of name
+			name_length = int.from_bytes(chunk[cursor:cursor+2], 'big')
+
+			#next name_length bytes: name
+			name = chunk[cursor+2:cursor+2+name_length].decode('UTF-8')
+
+			#move the cursor up...
+			cursor += name_length + 2
+			
+			#two bytes: length of value
+			value_length = int.from_bytes(chunk[cursor:cursor+2], 'big')
+
+			#next value_length bytes: value
+			value = chunk[cursor+2:cursor+2+value_length].decode('UTF-8')
+			
+			#move the cursor up again
+			cursor += value_length + 2
+
+			if name_length == 0 or value_length == 0:
+				raise SpdyProtocolError("zero-length name or value in n/v block")
+			if name in headers:
+				raise SpdyProtocolError("duplicate name in n/v block")
+			headers[name] = value
+
+		return headers
+
+	def _parse_frame(chunk):
 		if not isinstance(chunk, bytes):
 			raise TypeError('chunk must be a bytes string')
 
@@ -108,7 +141,8 @@ class Connection:
 				priority = chunk[16] & 0b1100000000000000
 
 				#ignore the rest of the seventeenth and the whole eighteenth byte. the rest is a header block
-				header_chunk = parse_header_chunk(chunk[18:length+8])
+				header_chunk = self._parse_header_chunk(chunk[18:length+8])
+
 			elif frame_type == SYN_REPLY:
 				raise NotImplementedError()
 			elif frame_type == RST_STREAM:
