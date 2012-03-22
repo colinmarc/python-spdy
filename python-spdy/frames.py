@@ -84,3 +84,6 @@ class Goaway(ControlFrame):
 		super(Goaway, self).__init__(version, GOAWAY)
 		self.last_stream_id = last_stream_id
 
+	def __repr__(self):
+		return 'GET THE FUCK OUT'
+
