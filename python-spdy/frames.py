@@ -71,4 +71,10 @@ class RstStream(ControlFrame):
 		self.stream_id = stream_id
 		self.error_code = error_code
 
+class Ping(ControlFrame):
+	def __init__(self, version, uniq_id):
+		super(Ping, self).__init__(version, PING)
+		self.uniq_id = uniq_id
 
+	def __repr__(self):
+		return 'PING {0}'.format(self.uniq_id)

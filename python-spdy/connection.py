@@ -115,9 +115,8 @@ class Connection:
 			if len(chunk) < frame_length:
 				return (0, None)
 
+			#the rest is data
 			data = chunk[8:frame_length]
-
-			print(spdy_version, self.version, frame_type, flags, length) 
 
 			if spdy_version != self.version:
 				raise SpdyProtocolError("incorrect SPDY version")
@@ -137,8 +136,6 @@ class Connection:
 				headers = self._parse_header_chunk(data[10:])
 				frame = SynStream(spdy_version, stream_id, headers)
 
-				print(headers)
-
 			elif frame_type == SYN_REPLY:
 				raise NotImplementedError()
 			elif frame_type == RST_STREAM:
@@ -148,7 +145,10 @@ class Connection:
 			elif frame_type == NOOP:
 				raise NotImplementedError()
 			elif frame_type == PING:
-				raise NotImplementedError()
+				#all four bytes: uniq_id
+				uniq_id = int.from_bytes(data, 'big') 
+				frame = Ping(spdy_version, uniq_id)
+	
 			elif frame_type == GOAWAY:
 				raise NotImplementedError()
 			elif frame_type == HEADERS:
