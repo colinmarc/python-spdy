@@ -33,7 +33,7 @@ class Connection:
 		self.input_buffer += chunk
 
 	def get_frame(self):
-		bytes_parsed, frame = self._parse_frame(self.input_buffer)
+		frame, bytes_parsed = self._parse_frame(self.input_buffer)
 		if bytes_parsed:
 			self.input_buffer = self.input_buffer[bytes_parsed:]
 		return frame
