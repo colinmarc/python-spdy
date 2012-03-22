@@ -1,20 +1,6 @@
 from spdy.frames import *
 from spdy._zlib_stream import Inflater, Deflater
 
-HEADER_ZLIB_DICT = \
-	b"optionsgetheadpostputdeletetraceacceptaccept-charsetaccept-encodingaccept-" \
-	b"languageauthorizationexpectfromhostif-modified-sinceif-matchif-none-matchi" \
-	b"f-rangeif-unmodifiedsincemax-forwardsproxy-authorizationrangerefererteuser" \
-	b"-agent10010120020120220320420520630030130230330430530630740040140240340440" \
-	b"5406407408409410411412413414415416417500501502503504505accept-rangesageeta" \
-	b"glocationproxy-authenticatepublicretry-afterservervarywarningwww-authentic" \
-	b"ateallowcontent-basecontent-encodingcache-controlconnectiondatetrailertran" \
-	b"sfer-encodingupgradeviawarningcontent-languagecontent-lengthcontent-locati" \
-	b"oncontent-md5content-rangecontent-typeetagexpireslast-modifiedset-cookieMo" \
-	b"ndayTuesdayWednesdayThursdayFridaySaturdaySundayJanFebMarAprMayJunJulAugSe" \
-	b"pOctNovDecchunkedtext/htmlimage/pngimage/jpgimage/gifapplication/xmlapplic" \
-	b"ation/xhtmltext/plainpublicmax-agecharset=iso-8859-1utf-8gzipdeflateHTTP/1" \
-	b".1statusversionurl"
 
 SPDY_2 = 'SPDY_2'
 VERSIONS = {
@@ -38,8 +24,8 @@ class Connection:
 		self.version = version
 		self.long_version = long_version
 
-		self.deflater = Deflater(dictionary=HEADER_ZLIB_DICT)
-		self.inflater = Inflater(dictionary=HEADER_ZLIB_DICT)
+		self.deflater = Deflater()
+		self.inflater = Inflater()
 		self.frame_queue = []
 		self.input_buffer = b''
 
