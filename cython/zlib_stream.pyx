@@ -13,7 +13,7 @@ HEADER_ZLIB_DICT = \
 	b"ndayTuesdayWednesdayThursdayFridaySaturdaySundayJanFebMarAprMayJunJulAugSe" \
 	b"pOctNovDecchunkedtext/htmlimage/pngimage/jpgimage/gifapplication/xmlapplic" \
 	b"ation/xhtmltext/plainpublicmax-agecharset=iso-8859-1utf-8gzipdeflateHTTP/1" \
-	b".1statusversionurl"
+	b".1statusversionurl\x00"
 
 cdef extern from "zlib.h":
 
@@ -53,41 +53,42 @@ cdef extern from "zlib.h":
 	int inflateSetDictionary(z_stream *strm, unsigned char *dictionary, unsigned int dictLength)
 
 cdef class Stream(object):
-	cdef z_stream *_st
+	cdef z_stream *_stream
 	def __init__(self):
-		self._st = <z_stream *>malloc(sizeof(z_stream))
-		self._st.next_out = <unsigned char*>NULL
-		self._st.avail_out = 0
-		self._st.zalloc = NULL
-		self._st.zfree = NULL
+		self._stream = <z_stream *>malloc(sizeof(z_stream))
+		self._stream.next_out = <unsigned char*>NULL
+		self._stream.avail_out = 0
+		self._stream.zalloc = NULL
+		self._stream.zfree = NULL
 
 cdef class Deflater(Stream):
 	def __init__(self, level=6):
 		Stream.__init__(self)
-		deflateInit(self._st, level)
-		deflateSetDictionary(self._st, HEADER_ZLIB_DICT, len(HEADER_ZLIB_DICT))
+		deflateInit(self._stream, level)
+		deflateSetDictionary(self._stream, HEADER_ZLIB_DICT, len(HEADER_ZLIB_DICT))
 
 	def __dealloc__(self):
-		deflateEnd(self._st)
-		free(self._st)
+		deflateEnd(self._stream)
+		free(self._stream)
 
 	def compress(self, chunk):
-		self._st.next_in = chunk
-		self._st.avail_in = len(chunk)
+		self._stream.next_in = chunk
+		self._stream.avail_in = len(chunk)
 
 		buf = bytearray()
 		chunk_len = 1024 * 64
 
 		while True:
 			out = bytes(chunk_len)
-			self._st.next_out = out
-			self._st.avail_out = chunk_len
+			self._stream.next_out = out
+			self._stream.avail_out = chunk_len
 
-			status = deflate(self._st, Z_SYNC_FLUSH)
-			boundary = chunk_len - self._st.avail_out
+			status = deflate(self._stream, Z_SYNC_FLUSH)
+			boundary = chunk_len - self._stream.avail_out
 			buf.extend(out[:boundary])
 
-			if status == Z_STREAM_END: break
+			if status == Z_STREAM_END or self._stream.avail_in == 0: 
+				break
 			elif status != Z_OK:
 				raise AssertionError(status)
 
@@ -97,35 +98,37 @@ cdef class Inflater(Stream):
 
 	def __init__(self):
 		Stream.__init__(self)
-		inflateInit(self._st)
+		inflateInit(self._stream)
 
 	def __dealloc__(self):
-		inflateEnd(self._st)
-		free(self._st)
+		inflateEnd(self._stream)
+		free(self._stream)
 
 	def decompress(self, chunk):
-		self._st.next_in = chunk
-		self._st.avail_in = len(chunk)
+		self._stream.next_in = chunk
+		self._stream.avail_in = len(chunk)
 			
 		buf = bytearray()
 		chunk_len = 1024 * 64
 
 		while True:
 			out = bytes(chunk_len)
-			self._st.next_out = out
-			self._st.avail_out = chunk_len
+			self._stream.next_out = out
+			self._stream.avail_out = chunk_len
 			
-			status = inflate(self._st, Z_SYNC_FLUSH)
+			status = inflate(self._stream, Z_SYNC_FLUSH)
 			if status == Z_NEED_DICT:
-				inflateSetDictionary(self._st, HEADER_ZLIB_DICT, len(HEADER_ZLIB_DICT))
+				err = inflateSetDictionary(self._stream, HEADER_ZLIB_DICT, len(HEADER_ZLIB_DICT))
+				assert err == Z_OK
 				continue
 
-			boundary = chunk_len - self._st.avail_out
+			boundary = chunk_len - self._stream.avail_out
 			buf.extend(out[:boundary])
 
-			if status == Z_STREAM_END: break
-			elif status != Z_OK:
-				raise AssertionError(status)
+			if status == Z_STREAM_END or self._stream.avail_in == 0:
+				break
+			else:
+				assert status == Z_OK
 
 		return bytes(buf)
 
