@@ -170,11 +170,20 @@ class Connection:
 				frame = SynReply(spdy_version, stream_id, headers, fin)
 
 			elif frame_type == RST_STREAM:
-				raise NotImplementedError()
+				#first four bytes, except for the first bit: stream_id
+				stream_id = int.from_bytes(_ignore_first_bit(data[0:4]), 'big')
+
+				#fifth through eighth bytes: error code
+				error_code = int.from_bytes(data[4:8], 'big')
+
+				frame = RstStream(spdy_version, stream_id, error_code)
+
 			elif frame_type == SETTINGS:
 				raise NotImplementedError()
+
 			elif frame_type == NOOP:
 				raise NotImplementedError()
+
 			elif frame_type == PING:
 				#all four bytes: uniq_id
 				uniq_id = int.from_bytes(data, 'big') 
@@ -187,6 +196,7 @@ class Connection:
 
 			elif frame_type == HEADERS:
 				raise NotImplementedError()
+
 			else:
 				raise NotImplementedError()
 
@@ -288,11 +298,18 @@ class Connection:
 				data.extend(self._encode_header_chunk(frame.headers))
 
 			elif frame.frame_type == RST_STREAM:
-				raise NotImplementedError()
+				#first four bytes, except for the first bit: stream_id	
+				data.extend(frame.stream_id.to_bytes(4, 'big'))
+
+				#fifth through eighth bytes: error code
+				data.extend(frame.error_code.to_bytes(4, 'big'))
+
 			elif frame.frame_type == SETTINGS:
 				raise NotImplementedError()
+
 			elif frame.frame_type == NOOP:
 				raise NotImplementedError()
+
 			elif frame.frame_type == PING:
 				#all four bytes: uniq_id
 				data = frame.uniq_id.to_bytes(4, 'big') 
@@ -303,6 +320,7 @@ class Connection:
 
 			elif frame.frame_type == HEADERS:
 				raise NotImplementedError()
+
 			else:
 				raise NotImplementedError()
 
