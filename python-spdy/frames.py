@@ -78,3 +78,9 @@ class Ping(ControlFrame):
 
 	def __repr__(self):
 		return 'PING {0}'.format(self.uniq_id)
+	
+class Goaway(ControlFrame):
+	def __init__(self, version, last_stream_id):
+		super(Goaway, self).__init__(version, GOAWAY)
+		self.last_stream_id = last_stream_id
+

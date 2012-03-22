@@ -150,7 +150,10 @@ class Connection:
 				frame = Ping(spdy_version, uniq_id)
 	
 			elif frame_type == GOAWAY:
-				raise NotImplementedError()
+				#all four bytes, except the first bit: last_stream_id
+				last_stream_id = _ignore_first_bit(int.from_bytes(data, 'big'))
+				frame = Goaway(spdy_version, last_stream_id)
+
 			elif frame_type == HEADERS:
 				raise NotImplementedError()
 			else:
