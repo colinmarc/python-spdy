@@ -49,42 +49,19 @@ class ControlFrame(Frame):
 	def _encode(self):
 		raise NotImplementedError()
 
-#class HeaderBlock:
-#	def __init__(self, headers):
-#		self._headers = headers
-#
-#	@property
-#	def headers(self):
-#		if not self._headers:
-#			self._parse()
-#		return self._headers
-#
-#	@headers.setter
-#	def headers(self, headers):
-#		self._headers = headers
-#	
-#	@headers.deleter
-#	def headers(self):
-#		del self._headers
-
 class SynStream(ControlFrame):
-	def __init__(self, version, stream_id, headers=None):
-#		ControlFrame.__init__(self, version, SYN_STREAM)
-#		HeaderBlock.__init__(self, headers)
+	def __init__(self, version, stream_id, headers):
 		super(SynStream, self).__init__(version, SYN_STREAM)
 		self.stream_id = stream_id
+		self.headers = headers
 
 class SynReply(ControlFrame):
-	def __init__(self, version, stream_id, headers=None):
-#		ControlFrame.__init__(self, version, SYN_REPLY)
-#		HeaderBlock.__init__(self, headers)
+	def __init__(self, version, stream_id, headers):
 		super(SynReply, self).__init__(version, SYN_HEADERS)
 		self.stream_id = stream_id
 	
 class Headers(ControlFrame):
-	def __init__(self, version, stream_id, headers=None):
-#		ControlFrame.__init__(self, version, HEADERS)
-#		HeaderBlock.__init__(self, headers)
+	def __init__(self, version, stream_id, headers):
 		super(Headers, self).__init__(version, HEADERS)
 		self.stream_id = stream_id
 

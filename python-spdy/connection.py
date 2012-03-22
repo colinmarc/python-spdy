@@ -63,7 +63,7 @@ class Connection:
 			out.extend(self._encode_frame(frame))
 		return out
 
-	def _parse_header_chunk(compressed_data):
+	def _parse_header_chunk(self, compressed_data):
 		chunk = Inflater.decompress(compressed_data)
 		headers = {}
 
@@ -99,7 +99,7 @@ class Connection:
 
 		return headers
 
-	def _parse_frame(chunk):
+	def _parse_frame(self, chunk):
 		if not isinstance(chunk, bytes):
 			raise TypeError('chunk must be a bytes string')
 
@@ -129,6 +129,8 @@ class Connection:
 				return (0, None)
 
 			print(spdy_version, frame_type, flags, length) 
+			if spdy_version != self.version:
+				raise SpdyProtocolError("incorrect SPDY version")
 
 			if frame_type == SYN_STREAM:
 				#ninth through twelvth bytes, except for the first bit: stream_id
@@ -140,8 +142,12 @@ class Connection:
 				#first 2 bits of seventeenth byte: priority
 				priority = chunk[16] & 0b1100000000000000
 
-				#ignore the rest of the seventeenth and the whole eighteenth byte. the rest is a header block
-				header_chunk = self._parse_header_chunk(chunk[18:length+8])
+				#ignore the rest of the seventeenth and the whole eighteenth byte (they are reserved)
+				#the rest is a header block
+				headers = self._parse_header_chunk(chunk[18:length+8])
+				frame = SynStream(spdy_version, stream_id, headers)
+
+				print(headers)
 
 			elif frame_type == SYN_REPLY:
 				raise NotImplementedError()
