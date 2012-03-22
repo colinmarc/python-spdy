@@ -16,7 +16,7 @@ FLAG_UNID = 0x02
 def _ignore_first_bit(b):
 	arr = bytearray()
 	arr.append(b[0] & 0b01111111)
-	arr += b[1:]
+	arr.extend(b[1:])
 	return bytes(arr)
 
 class Connection:
@@ -31,7 +31,7 @@ class Connection:
 		self.deflater = Deflater()
 		self.inflater = Inflater()
 		self.frame_queue = []
-		self.input_buffer = b''
+		self.input_buffer = bytearray()
 
 		if side == SERVER:
 			self._stream_id = 2
@@ -53,10 +53,10 @@ class Connection:
 		return pid
 
 	def incoming(self, chunk):
-		self.input_buffer += chunk
+		self.input_buffer.extend(chunk)
 
 	def get_frame(self):
-		frame, bytes_parsed = self._parse_frame(self.input_buffer)
+		frame, bytes_parsed = self._parse_frame(bytes(self.input_buffer))
 		if bytes_parsed:
 			self.input_buffer = self.input_buffer[bytes_parsed:]
 		return frame
@@ -110,9 +110,6 @@ class Connection:
 		return headers
 
 	def _parse_frame(self, chunk):
-		if not isinstance(chunk, bytes):
-			raise TypeError('chunk must be a bytes string')
-
 		if len(chunk) < 8:
 			return (0, None)
 
@@ -254,17 +251,17 @@ class Connection:
 				out[4] = flags
 
 				#first through fourth bytes, except for the first bit: stream_id
-				data += frame.stream_id.to_bytes(4, 'big')
+				data.extend(frame.stream_id.to_bytes(4, 'big'))
 				
 				#fifth through eighth bytes, except for the first bit: associated stream_id
-				data += bytes(4) #TODO
+				data.extend(bytes(4)) #TODO
 				
 				#first 2 bits of ninth byte: priority
 				#ignore the rest of the ninth and the whole tenth byte (they are reserved)
-				data += bytes(2) #TODO
+				data.extend(bytes(2)) #TODO
 
 				#the rest is a header block
-				data += self._encode_header_chunk(frame.headers)
+				data.extend(self._encode_header_chunk(frame.headers))
 
 			elif frame.frame_type == SYN_REPLY:
 				raise NotImplementedError()
@@ -288,14 +285,14 @@ class Connection:
 				raise NotImplementedError()
 
 			#sixth, seventh, eigth: length
-			out += len(data).to_bytes(3, 'big')
+			out.extend(len(data).to_bytes(3, 'big'))
 
 			# the rest is data
 			out.extend(data)
 		
 		else: #data frame
 			#first four bytes: stream_id
-			out += frame.stream_id.to_bytes(4, 'big')
+			out.extend(frame.stream_id.to_bytes(4, 'big'))
 			
 			#fifth: flags
 			flags = 0
@@ -305,10 +302,10 @@ class Connection:
 
 			#sixth, seventh and eighth bytes: length
 			data_length = len(frame.data)
-			out += data_length.to_bytes(3, 'big')
+			out.extend(data_length.to_bytes(3, 'big'))
 		
 			#rest is data
-			out += data
+			out.extend(data)
 
 		return out
 
