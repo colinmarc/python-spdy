@@ -58,7 +58,7 @@ class Connection:
 		num_values = int.from_bytes(chunk[0:2], 'big')	
 
 		#after that...
-		cursor = 0
+		cursor = 2
 		for _ in range(num_values):
 			#two bytes: length of name
 			name_length = int.from_bytes(chunk[cursor:cursor+2], 'big')
