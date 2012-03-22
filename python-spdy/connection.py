@@ -115,24 +115,26 @@ class Connection:
 			if len(chunk) < frame_length:
 				return (0, None)
 
+			data = chunk[8:frame_length]
+
 			print(spdy_version, self.version, frame_type, flags, length) 
 
 			if spdy_version != self.version:
 				raise SpdyProtocolError("incorrect SPDY version")
 
 			if frame_type == SYN_STREAM:
-				#ninth through twelvth bytes, except for the first bit: stream_id
-				stream_id = _ignore_first_bit(int.from_bytes(chunk[8:12], 'big'), 32)
+				#first through fourth bytes, except for the first bit: stream_id
+				stream_id = _ignore_first_bit(int.from_bytes(data[0:4], 'big'), 32)
 				
-				#thirteenth through sixteenth bytes, except for the first bit: associated stream_id
-				assoc_stream_id = _ignore_first_bit(int.from_bytes(chunk[12:16], 'big'), 32)
+				#fifth through eighth bytes, except for the first bit: associated stream_id
+				assoc_stream_id = _ignore_first_bit(int.from_bytes(data[4:8], 'big'), 32)
 				
-				#first 2 bits of seventeenth byte: priority
-				priority = chunk[16] & 0b1100000000000000
+				#first 2 bits of ninth byte: priority
+				priority = data[8] & 0b1100000000000000
 
-				#ignore the rest of the seventeenth and the whole eighteenth byte (they are reserved)
+				#ignore the rest of the ninth and the whole tenth byte (they are reserved)
 				#the rest is a header block
-				headers = self._parse_header_chunk(chunk[18:length+8])
+				headers = self._parse_header_chunk(data[10:])
 				frame = SynStream(spdy_version, stream_id, headers)
 
 				print(headers)
