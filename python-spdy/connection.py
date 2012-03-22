@@ -10,6 +10,9 @@ VERSIONS = {
 SERVER = 'SERVER'
 CLIENT = 'CLIENT'
 
+FLAG_FIN = 0x01
+FLAG_UNID = 0x02
+
 def _ignore_first_bit(n, l):
 	return n & int('0' + ''.join(['1' for p in range(l-1)]), 2)
 
@@ -141,6 +144,9 @@ class Connection:
 				raise SpdyProtocolError("incorrect SPDY version")
 
 			if frame_type == SYN_STREAM:
+				fin = (flags & FLAG_FIN == FLAG_FIN)
+				unidirectional = (flags & FLAG_UNID == FLAG_UNID)
+
 				#first through fourth bytes, except for the first bit: stream_id
 				stream_id = _ignore_first_bit(int.from_bytes(data[0:4], 'big'), 32)
 				
@@ -153,7 +159,7 @@ class Connection:
 				#ignore the rest of the ninth and the whole tenth byte (they are reserved)
 				#the rest is a header block
 				headers = self._parse_header_chunk(data[10:])
-				frame = SynStream(spdy_version, stream_id, headers)
+				frame = SynStream(spdy_version, stream_id, headers, fin, unidirectional)
 
 			elif frame_type == SYN_REPLY:
 				raise NotImplementedError()
@@ -179,9 +185,8 @@ class Connection:
 				raise NotImplementedError()
 
 		else: #data frame
-			#second, third and fourth bytes (and rest of first): stream_id
-			#TODO: account for stream_ids > 32767
-			stream_id = int.from_bytes(chunk[1:4], 'big')
+			#first four bytes, except the first bit: stream_id
+			stream_id = _ignore_first_bit(int.from_bytes(chunk[0:4], 'big'))
 			
 			#fifth byte: flags
 			flags = chunk[4]

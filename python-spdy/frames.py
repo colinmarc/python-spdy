@@ -27,10 +27,11 @@ class Frame(object):
 	pass
 
 class DataFrame(Frame):
-	def __init__(self, stream_id, data=None):
+	def __init__(self, stream_id, data=None, fin=True):
 		self.is_control = False
 		self.stream_id = stream_id
 		self.data = data
+		self.fin = False
 
 class ControlFrame(Frame):
 	def __init__(self, version, frame_type):
@@ -42,13 +43,13 @@ class ControlFrame(Frame):
 		return self.frame_type
 
 class SynStream(ControlFrame):
-	def __init__(self, version, stream_id, headers):
+	def __init__(self, version, stream_id, headers, fin=True, unidirectional=False):
 		super(SynStream, self).__init__(version, SYN_STREAM)
 		self.stream_id = stream_id
 		self.headers = headers
 
 class SynReply(ControlFrame):
-	def __init__(self, version, stream_id, headers):
+	def __init__(self, version, stream_id, headers, fin=True):
 		super(SynReply, self).__init__(version, SYN_HEADERS)
 		self.stream_id = stream_id
 	
