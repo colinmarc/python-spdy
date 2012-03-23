@@ -5,6 +5,13 @@ from bitarray import bitarray
 SERVER = 'SERVER'
 CLIENT = 'CLIENT'
 
+def _print_bits_nice(bits):
+	for i in range(0, len(bits), 4):
+		if i % 32 == 0: print('')
+		print(bits[i:i+4].to01(), end=" ")
+		print("")
+bitarray.print_nice = _print_bits_nice
+
 def _ignore_first_bit(b):
 	arr = bytearray()
 	arr.append(b[0] & 0b01111111)
@@ -111,7 +118,6 @@ class Connection:
 			return (None, 0)
 
 		#first bit: control or data frame?
-
 		first_bit = _bitmask(8, 1, 1)
 		control_frame = (chunk[0] & first_bit == first_bit)
 
@@ -160,8 +166,15 @@ class Connection:
 				if key == 'headers': #headers are compressed
 					args[key] = self._parse_header_chunk(value.tobytes())
 				else:
+					#we have to pad values on the left, because bitarray will assume
+					#that you want it padded from the right
+					gap = len(value) % 8
+					if gap:
+						zeroes = bitarray(8 - gap)
+						zeroes.setall(False)
+						value = zeroes + value
 					args[key] = int.from_bytes(value.tobytes(), 'big')
-					
+				
 				if num_bits == -1:
 					break
 
@@ -225,7 +238,7 @@ class Connection:
 			out.extend(frame.frame_type.to_bytes(2, 'big'))
 
 			#fifth: flags
-			out.extend(frame.flags.to_bytes(1, 'big'))
+			out.append(frame.flags)
 
 			bits = bitarray()
 			for key, num_bits in frame.definition:
@@ -250,7 +263,6 @@ class Connection:
 				if num_bits == -1:
 					break
 
-
 			data = bits.tobytes() 
 
 			#sixth, seventh and eighth bytes: length
@@ -260,21 +272,19 @@ class Connection:
 			out.extend(data)
 		
 		else: #data frame
+			
 			#first four bytes: stream_id
 			out.extend(frame.stream_id.to_bytes(4, 'big'))
 			
 			#fifth: flags
-			flags = 0
-			if frame.fin:
-				flags = flags | FLAG_FIN
-			out.append(flags)
+			out.append(frame.flags)
 
 			#sixth, seventh and eighth bytes: length
 			data_length = len(frame.data)
 			out.extend(data_length.to_bytes(3, 'big'))
 		
 			#rest is data
-			out.extend(data)
+			out.extend(frame.data)
 
 		return out
 

@@ -61,10 +61,11 @@ class DataFrame(Frame):
 		self.is_control = False
 		self.stream_id = stream_id
 		self.data = data
+		self.flags = flags
 		self.fin = (flags & FLAG_FIN == FLAG_FIN)
 
 	def __repr__(self):
-		return 'DATA ({0})'.format(len(self.data))
+		return 'DATA ({0}) id={1}'.format(len(self.data), self.stream_id)
 
 class ControlFrame(Frame):
 	"""
@@ -146,13 +147,14 @@ class SynReply(ControlFrame):
 		('headers', -1)
 	]
 
-	def __init__(self, stream_id, headers, flags=FLAG_FIN, version=DEFAULT_VERSION):
+	def __init__(self, stream_id, headers, flags=0, version=DEFAULT_VERSION):
 		super(SynReply, self).__init__(SYN_REPLY, flags, version)
 		self.stream_id = stream_id
 		self.headers = headers
 		self.fin = (flags & FLAG_FIN == FLAG_FIN)
 
-	
+	def __repr__(self):
+		return 'SYN_REPLY id={0}'.format(self.stream_id)
 
 class Headers(ControlFrame):
 	"""
@@ -176,7 +178,7 @@ class Headers(ControlFrame):
 		('headers', -1)
 	]
 
-	def __init__(self, stream_id, headers, version=DEFAULT_VERSION):
+	def __init__(self, stream_id, headers, flags=0, version=DEFAULT_VERSION):
 		super(Headers, self).__init__(HEADERS, 0, version)
 		self.stream_id = stream_id
 		self.headers = headers
@@ -202,7 +204,7 @@ class RstStream(ControlFrame):
 		('error_code', 32)
 	]
 
-	def __init__(self, stream_id, error_code, version=DEFAULT_VERSION):
+	def __init__(self, stream_id, error_code, flags=0, version=DEFAULT_VERSION):
 		super(RstStream, self).__init__(RST_STREAM, 0, version)
 		self.stream_id = stream_id
 		self.error_code = error_code
@@ -222,10 +224,10 @@ class Ping(ControlFrame):
 	"""
 	
 	definition = [
-		('id', 32)
+		('uniq_id', 32)
 	]
 
-	def __init__(self, uniq_id, version=DEFAULT_VERSION):
+	def __init__(self, uniq_id, flags=0, version=DEFAULT_VERSION):
 		super(Ping, self).__init__(PING, 0, version)
 		self.uniq_id = uniq_id
 
@@ -247,7 +249,7 @@ class Goaway(ControlFrame):
 		('last_stream_id', 32)
 	]
 	
-	def __init__(self, last_stream_id, version=DEFAULT_VERSION):
+	def __init__(self, last_stream_id, flags=0, version=DEFAULT_VERSION):
 		super(Goaway, self).__init__(GOAWAY, 0, version)
 		self.last_stream_id = last_stream_id
 
