@@ -1,23 +1,20 @@
 from spdy.frames import *
 from spdy._zlib_stream import Inflater, Deflater
-
-
-SPDY_2 = 2
-VERSIONS = {
-	2: 'SPDY_2'
-}
+from bitarray import bitarray
 
 SERVER = 'SERVER'
 CLIENT = 'CLIENT'
-
-FLAG_FIN = 0x01
-FLAG_UNID = 0x02
 
 def _ignore_first_bit(b):
 	arr = bytearray()
 	arr.append(b[0] & 0b01111111)
 	arr.extend(b[1:])
 	return bytes(arr)
+
+def _bitmask(length, split, mask=0):
+	invert = 1 if mask == 0 else 0
+	b = str(mask)*split + str(invert)*(length-split)
+	return int(b, 2)
 
 class Connection:
 	def __init__(self, side, version=2):
@@ -111,14 +108,18 @@ class Connection:
 
 	def _parse_frame(self, chunk):
 		if len(chunk) < 8:
-			return (0, None)
+			return (None, 0)
 
 		#first bit: control or data frame?
-		control_frame = (chunk[0] & 0b10000000 == 128)
+
+		first_bit = _bitmask(8, 1, 1)
+		control_frame = (chunk[0] & first_bit == first_bit)
 
 		if control_frame:
 			#second byte (and rest of first, after the first bit): spdy version
-			spdy_version = int.from_bytes(_ignore_first_bit(chunk[0:2]), 'big')
+			spdy_version = int.from_bytes(chunk[0:2], 'big') & _bitmask(16, 1, 0)
+			if spdy_version != self.version:
+				raise SpdyProtocolError("incorrect SPDY version")
 
 			#third and fourth byte: frame type
 			frame_type = int.from_bytes(chunk[2:4], 'big')
@@ -132,73 +133,39 @@ class Connection:
 			length = int.from_bytes(chunk[5:8], 'big')
 			frame_length = length + 8
 			if len(chunk) < frame_length:
-				return (0, None)
+				return (None, 0)
 
 			#the rest is data
 			data = chunk[8:frame_length]
 
-			if spdy_version != self.version:
-				raise SpdyProtocolError("incorrect SPDY version")
+			bits = bitarray()
+			bits.frombytes(data)
+			frame_cls = FRAME_TYPES[frame_type]
+			args = {
+				'version': spdy_version,
+				'flags': flags
+			}
 
-			if frame_type == SYN_STREAM:
-				fin = (flags & FLAG_FIN == FLAG_FIN)
-				unidirectional = (flags & FLAG_UNID == FLAG_UNID)
+			for key, num_bits in frame_cls.definition:
+				if not key:
+					bits = bits[num_bits:]
+					continue
 
-				#first through fourth bytes, except for the first bit: stream_id
-				stream_id = int.from_bytes(_ignore_first_bit(data[0:4]), 'big')
-				
-				#fifth through eighth bytes, except for the first bit: associated stream_id
-				assoc_stream_id = int.from_bytes(_ignore_first_bit(data[4:8]), 'big')
-				
-				#first 2 bits of ninth byte: priority
-				priority = data[8] & 0b1100000000000000
+				if num_bits == -1:
+					value = bits
+				else:
+					value = bits[:num_bits]
+					bits = bits[num_bits:]
+					
+				if key == 'headers': #headers are compressed
+					args[key] = self._parse_header_chunk(value.tobytes())
+				else:
+					args[key] = int.from_bytes(value.tobytes(), 'big')
+					
+				if num_bits == -1:
+					break
 
-				#ignore the rest of the ninth and the whole tenth byte (they are reserved)
-				#the rest is a header block
-				headers = self._parse_header_chunk(data[10:])
-				frame = SynStream(spdy_version, stream_id, headers, fin, unidirectional)
-
-			elif frame_type == SYN_REPLY:
-				fin = (flags & FLAG_FIN == FLAG_FIN)
-
-				#first through fourth bytes, except for the first bit: stream_id
-				stream_id = int.from_bytes(_ignore_first_bit(data[0:4]), 'big')
-				
-				#ignore the fifth and sixth bytes (they are reserved)
-				#the rest is a header block
-				headers = self._parse_header_chunk(data[6:])
-				frame = SynReply(spdy_version, stream_id, headers, fin)
-
-			elif frame_type == RST_STREAM:
-				#first four bytes, except for the first bit: stream_id
-				stream_id = int.from_bytes(_ignore_first_bit(data[0:4]), 'big')
-
-				#fifth through eighth bytes: error code
-				error_code = int.from_bytes(data[4:8], 'big')
-
-				frame = RstStream(spdy_version, stream_id, error_code)
-
-			elif frame_type == SETTINGS:
-				raise NotImplementedError()
-
-			elif frame_type == NOOP:
-				raise NotImplementedError()
-
-			elif frame_type == PING:
-				#all four bytes: uniq_id
-				uniq_id = int.from_bytes(data, 'big') 
-				frame = Ping(spdy_version, uniq_id)
-	
-			elif frame_type == GOAWAY:
-				#all four bytes, except the first bit: last_stream_id
-				last_stream_id = int.from_bytes(_ignore_first_bit(data), 'big')
-				frame = Goaway(spdy_version, last_stream_id)
-
-			elif frame_type == HEADERS:
-				raise NotImplementedError()
-
-			else:
-				raise NotImplementedError()
+			frame = frame_cls(**args)
 
 		else: #data frame
 			#first four bytes, except the first bit: stream_id
@@ -214,7 +181,7 @@ class Connection:
 				return (0, None)
 
 			data = chunk[8:frame_length]
-			frame = DataFrame(stream_id, frame_length)
+			frame = DataFrame(stream_id, data)
 
 		return (frame, frame_length)
 
@@ -222,7 +189,7 @@ class Connection:
 		chunk = bytearray()
 
 		#first two bytes: number of pairs
-		chunk += len(headers).to_bytes(2, 'big')
+		chunk.extend(len(headers).to_bytes(2, 'big'))
 
 		#after that...
 		for name, value in headers.items():
@@ -230,16 +197,16 @@ class Connection:
 			value = bytes(value, 'UTF-8')
 
 			#two bytes: length of name
-			chunk += len(name).to_bytes(2, 'big')
+			chunk.extend(len(name).to_bytes(2, 'big'))
 
 			#next name_length bytes: name
-			chunk += name
+			chunk.extend(name)
 
 			#two bytes: length of value
-			chunk += len(value).to_bytes(2, 'big')
+			chunk.extend(len(value).to_bytes(2, 'big'))
 
 			#next value_length bytes: value
-			chunk += value
+			chunk.extend(value)
 			
 		return self.deflater.compress(bytes(chunk))
 		
@@ -249,82 +216,44 @@ class Connection:
 
 		if frame.is_control:
 			#first two bytes: version
-			out += frame.version.to_bytes(2, 'big')
+			out.extend(frame.version.to_bytes(2, 'big'))
 
-			#make sure first bit is control
-			out[0] = out[0] | 0b10000000
+			#set the first bit to control
+			out[0] = out[0] | _bitmask(8, 1, 1)
 
 			#third and fourth: frame type
-			out += frame.frame_type.to_bytes(2, 'big')
+			out.extend(frame.frame_type.to_bytes(2, 'big'))
 
 			#fifth: flags
-			out += bytes(1) #set later
+			out.extend(frame.flags.to_bytes(1, 'big'))
 
-			data = bytearray()
+			bits = bitarray()
+			for key, num_bits in frame.definition:
 
-			if frame.frame_type == SYN_STREAM:
-				#set the flags
-				flags = 0
-				if frame.fin: flags |= FLAG_FIN
-				if frame.unidirectional: flags |= FLAG_UNID
-				out[4] = flags
+				if not key:
+					zeroes = bitarray(num_bits)
+					zeroes.setall(False)
+					bits += zeroes
+					continue
 
-				#first through fourth bytes, except for the first bit: stream_id
-				data.extend(frame.stream_id.to_bytes(4, 'big'))
-				
-				#fifth through eighth bytes, except for the first bit: associated stream_id
-				data.extend(bytes(4)) #TODO
-				
-				#first 2 bits of ninth byte: priority
-				#ignore the rest of the ninth and the whole tenth byte (they are reserved)
-				data.extend(bytes(2)) #TODO
+				value = getattr(frame, key)
+				if key == 'headers':
+					chunk = bitarray()
+					chunk.frombytes(self._encode_header_chunk(value))
+				else:
+					chunk = bitarray(bin(value)[2:])
+					zeroes = bitarray(num_bits - len(chunk))
+					zeroes.setall(False)
+					chunk = zeroes + chunk #pad with zeroes
 
-				#the rest is a header block
-				data.extend(self._encode_header_chunk(frame.headers))
+				bits += chunk
+				if num_bits == -1:
+					break
 
-			elif frame.frame_type == SYN_REPLY:
-				#set the flags
-				flags = 0
-				if frame.fin: flags |= FLAG_FIN
-				out[4] = flags
 
-				#first through fourth bytes, except for the first bit: stream_id
-				data.extend(frame.stream_id.to_bytes(4, 'big'))
+			data = bits.tobytes() 
 
-				#fifth and sixth bytes: reserved
-				data.extend(bytes(2))
-
-				#the rest is a header block
-				data.extend(self._encode_header_chunk(frame.headers))
-
-			elif frame.frame_type == RST_STREAM:
-				#first four bytes, except for the first bit: stream_id	
-				data.extend(frame.stream_id.to_bytes(4, 'big'))
-
-				#fifth through eighth bytes: error code
-				data.extend(frame.error_code.to_bytes(4, 'big'))
-
-			elif frame.frame_type == SETTINGS:
-				raise NotImplementedError()
-
-			elif frame.frame_type == NOOP:
-				raise NotImplementedError()
-
-			elif frame.frame_type == PING:
-				#all four bytes: uniq_id
-				data = frame.uniq_id.to_bytes(4, 'big') 
-
-			elif frame.frame_type == GOAWAY:
-				#all four bytes, except the first bit: last_stream_id
-				data = frame.last_stream_id.to_bytes(4, 'big')
-
-			elif frame.frame_type == HEADERS:
-				raise NotImplementedError()
-
-			else:
-				raise NotImplementedError()
-
-			#sixth, seventh, eigth: length
+			#sixth, seventh and eighth bytes: length
 			out.extend(len(data).to_bytes(3, 'big'))
 
 			# the rest is data
