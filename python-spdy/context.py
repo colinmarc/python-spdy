@@ -5,25 +5,12 @@ from bitarray import bitarray
 SERVER = 'SERVER'
 CLIENT = 'CLIENT'
 
-def _print_bits_nice(bits):
-	for i in range(0, len(bits), 4):
-		if i % 32 == 0: print('')
-		print(bits[i:i+4].to01(), end=" ")
-		print("")
-bitarray.print_nice = _print_bits_nice
-
-def _ignore_first_bit(b):
-	arr = bytearray()
-	arr.append(b[0] & 0b01111111)
-	arr.extend(b[1:])
-	return bytes(arr)
-
 def _bitmask(length, split, mask=0):
 	invert = 1 if mask == 0 else 0
 	b = str(mask)*split + str(invert)*(length-split)
 	return int(b, 2)
 
-class Connection:
+class Context(object):
 	def __init__(self, side, version=2):
 		if side not in [SERVER, CLIENT]:
 			raise TypeError("side must be SERVER or CLIENT")
