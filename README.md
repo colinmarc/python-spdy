@@ -16,7 +16,7 @@ usage
 		if not data:
 			continue
 
-		context.incoming(incoming_data)
+		context.incoming(data)
 
 		while True:
 			frame = context.get_frame()
