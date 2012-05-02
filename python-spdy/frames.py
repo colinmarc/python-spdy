@@ -111,7 +111,7 @@ class SynStream(ControlFrame):
 	+----------------------------------+
 	|X|Associated-To-Stream-ID (31bits)|
 	+----------------------------------+
-	| Pri | Unused     |               |
+	| Pri|Unused |Slot |               |
 	+-------------------               |
 	|      Name/value header block     |
 	|               ...                |
@@ -121,16 +121,17 @@ class SynStream(ControlFrame):
 	definition = [
 		(False, 1), ('stream_id', 31),
 		(False, 1), ('assoc_stream_id', 31),
-		('priority', 2), (False, 14),
+		('priority', 2), (False, 5), ('slot', 8),
 		('headers', -1)
 	]
 
-	def __init__(self, stream_id, headers, priority=0, assoc_stream_id=0, flags=FLAG_FIN, version=DEFAULT_VERSION):
+	def __init__(self, stream_id, headers, priority=0, assoc_stream_id=0, slot=0, flags=FLAG_FIN, version=DEFAULT_VERSION):
 		super(SynStream, self).__init__(SYN_STREAM, flags, version)
 		self.stream_id = stream_id
 		self.assoc_stream_id = assoc_stream_id
 		self.headers = headers
 		self.priority = priority
+		self.slot = slot
 		self.flags = flags
 		self.fin = (flags & FLAG_FIN == FLAG_FIN)
 		self.unidirectional = (flags & FLAG_UNID == FLAG_UNID)

@@ -18,7 +18,7 @@ _last_15_bits = _bitmask(16, 1, 0)
 
 class Context(object):
 	def __init__(self, side, version=2):
-		if side not in [SERVER, CLIENT]:
+		if side not in (SERVER, CLIENT):
 			raise TypeError("side must be SERVER or CLIENT")
 
 		if not version in VERSIONS:
@@ -70,8 +70,9 @@ class Context(object):
 			out.extend(self._encode_frame(frame))
 		return out
 
-	def _parse_header_chunk(self, compressed_data):
+	def _parse_header_chunk(self, compressed_data, version):
 		chunk = self.inflater.decompress(compressed_data)
+		length_size = 2 if version == 2 else 4	
 		headers = {}
 
 		#first two bytes: number of pairs
@@ -80,24 +81,22 @@ class Context(object):
 		#after that...
 		cursor = 2
 		for _ in range(num_values):
-			#two bytes: length of name
-			name_length = int.from_bytes(chunk[cursor:cursor+2], 'big')
+			#two/four bytes: length of name
+			name_length = int.from_bytes(chunk[cursor:cursor+length_size], 'big')
+			cursor += length_size
 
 			#next name_length bytes: name
-			name = chunk[cursor+2:cursor+2+name_length].decode('UTF-8')
-
-			#move the cursor up...
-			cursor += name_length + 2
+			name = chunk[cursor:cursor+name_length].decode('UTF-8')
+			cursor += name_length
 			
-			#two bytes: length of value
-			value_length = int.from_bytes(chunk[cursor:cursor+2], 'big')
+			#two/four bytes: length of value
+			value_length = int.from_bytes(chunk[cursor:cursor+length_size], 'big')
+			cursor += length_size
 
 			#next value_length bytes: value
-			value = chunk[cursor+2:cursor+2+value_length].decode('UTF-8')
+			value = chunk[cursor:cursor+value_length].decode('UTF-8')
+			cursor += value_length
 			
-			#move the cursor up again
-			cursor += value_length + 2
-
 			if name_length == 0 or value_length == 0:
 				raise SpdyProtocolError("zero-length name or value in n/v block")
 			if name in headers:
@@ -157,7 +156,7 @@ class Context(object):
 					bits = bits[num_bits:]
 					
 				if key == 'headers': #headers are compressed
-					args[key] = self._parse_header_chunk(value.tobytes())
+					args[key] = self._parse_header_chunk(value.tobytes(), self.version)
 				else:
 					#we have to pad values on the left, because bitarray will assume
 					#that you want it padded from the right
