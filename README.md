@@ -14,19 +14,22 @@ usage
 	while True:
 		data = sock.recv(1024)
 		if not data:
-			continue
+			break
 
 		context.incoming(data)
 
 		while True:
 			frame = context.get_frame()
-			print(frame)
+			if not frame: 
+				break
 			
 			if isinstance(frame, spdy.frames.Ping):
 				pong = spdy.frames.Ping(frame.ping_id)
 				context.put_frame(pong)
 	
-		sock.sendall(context.outgoing())	
+		outgoing = context.outgoing()
+		if outgoing:
+			sock.sendall(context.outgoing())	
 
 installation
 ------------
