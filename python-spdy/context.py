@@ -5,6 +5,9 @@ from bitarray import bitarray
 SERVER = 'SERVER'
 CLIENT = 'CLIENT'
 
+class SpdyProtocolError(Exception):
+	pass
+
 def _bitmask(length, split, mask=0):
 	invert = 1 if mask == 0 else 0
 	b = str(mask)*split + str(invert)*(length-split)
@@ -134,6 +137,7 @@ class Context(object):
 			bits = bitarray()
 			bits.frombytes(data)
 			frame_cls = FRAME_TYPES[frame_type]
+
 			args = {
 				'version': spdy_version,
 				'flags': flags

@@ -31,8 +31,6 @@ ERROR_CODES = {
 FLAG_FIN = 0x01
 FLAG_UNID = 0x02
 
-class SpdyProtocolError(Exception):
-	pass
 
 #definition format
 #definition = [
