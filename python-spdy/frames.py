@@ -11,6 +11,18 @@ GOAWAY = 7
 HEADERS = 8
 WINDOW_UPDATE = 9
 
+FRAME_TYPES = {
+	SYN_STREAM: SynStream,
+	SYN_REPLY: SynReply,
+	RST_STREAM: RstStream,
+#	4: Settings, #TODO
+#	5: Noop,
+	PING: Ping,
+	GOAWAY: Goaway,
+	HEADERS: Headers
+	WINDOW_UPDATE: WindowUpdate
+}
+
 PROTOCOL_ERROR = 1
 INVALID_STREAM = 2
 REFUSED_STREAM = 3
@@ -282,14 +294,3 @@ class WindowUpdate(ControlFrame):
 		self.stream_id = stream_id
 		self.delta_window_size = delta_window_size
 
-FRAME_TYPES = {
-	SYN_STREAM: SynStream,
-	SYN_REPLY: SynReply,
-	RST_STREAM: RstStream,
-#	4: Settings, #TODO
-#	5: Noop,
-	PING: Ping,
-	GOAWAY: Goaway,
-	HEADERS: Headers
-	WINDOW_UPDATE: WindowUpdate
-}
