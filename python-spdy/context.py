@@ -13,6 +13,9 @@ def _bitmask(length, split, mask=0):
 	b = str(mask)*split + str(invert)*(length-split)
 	return int(b, 2)
 
+_first_bit = _bitmask(8, 1, 1)
+_last_15_bits = _bitmask(16, 1, 0)
+
 class Context(object):
 	def __init__(self, side, version=2):
 		if side not in [SERVER, CLIENT]:
@@ -108,12 +111,11 @@ class Context(object):
 			return (None, 0)
 
 		#first bit: control or data frame?
-		first_bit = _bitmask(8, 1, 1)
-		control_frame = (chunk[0] & first_bit == first_bit)
+		control_frame = (chunk[0] & _first_bit == _first_bit)
 
 		if control_frame:
 			#second byte (and rest of first, after the first bit): spdy version
-			spdy_version = int.from_bytes(chunk[0:2], 'big') & _bitmask(16, 1, 0)
+			spdy_version = int.from_bytes(chunk[0:2], 'big') & _last_15_bits
 			if spdy_version != self.version:
 				raise SpdyProtocolError("incorrect SPDY version")
 
@@ -223,7 +225,7 @@ class Context(object):
 			out.extend(frame.version.to_bytes(2, 'big'))
 
 			#set the first bit to control
-			out[0] = out[0] | _bitmask(8, 1, 1)
+			out[0] = out[0] | _first_bit
 
 			#third and fourth: frame type
 			out.extend(frame.frame_type.to_bytes(2, 'big'))
