@@ -1,7 +1,7 @@
 import socket
 import ssl
 import spdy.frames
-from spdy.connection import *
+import spdy
 from pprint import pprint
 
 server = socket.socket()
@@ -9,25 +9,25 @@ server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(('', 9599))
 server.listen(5)
 
-ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
 ctx.load_cert_chain('server.crt', 'server.key')
 ctx.set_npn_protocols(['spdy/2'])
 
 def handle_frame(conn, f):
-	print("server says,", f)
+	print("CLIENT SAYS,", f)
 		
 	if isinstance(f, spdy.frames.Ping):
 		ping = spdy.frames.Ping(f.uniq_id)
 		conn.put_frame(ping)	
-		print(ping, "says client")
+		print(str(ping) + ", SAYS SERVER")
+
 	elif isinstance(f, spdy.frames.SynStream):
-		pprint(f.headers)	
 		resp = spdy.frames.SynReply(f.stream_id, {'status': '200 OK', 'version': 'HTTP/1.1'}, flags=0)
 		conn.put_frame(resp)
-		print(resp, "says client")
-		data = spdy.frames.DataFrame(f.stream_id, b"hello world!!!", flags=1)
+		print(str(resp) + ", SAYS SERVER")
+		data = spdy.frames.DataFrame(f.stream_id, b"hello, world!", flags=1)
 		conn.put_frame(data)
-		print(data, "says client")
+		print(str(data) + ", SAYS SERVER")
 
 try:
 	while True:
@@ -35,7 +35,7 @@ try:
 			sock, sockaddr = server.accept()
 			ss = ctx.wrap_socket(sock, server_side=True)
 
-			conn = Connection(SERVER) 
+			conn = spdy.Context(spdy.SERVER) 
 
 			while True:
 				d = ss.recv(1024)
