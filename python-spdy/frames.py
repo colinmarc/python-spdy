@@ -9,6 +9,7 @@ NOOP = 5
 PING = 6
 GOAWAY = 7
 HEADERS = 8
+WINDOW_UPDATE = 9
 
 PROTOCOL_ERROR = 1
 INVALID_STREAM = 2
@@ -31,6 +32,8 @@ ERROR_CODES = {
 FLAG_FIN = 0x01
 FLAG_UNID = 0x02
 
+class InvalidFrameError(Exception):
+	pass
 
 #definition format
 #definition = [
@@ -88,7 +91,7 @@ class ControlFrame(Frame):
 class SynStream(ControlFrame):
 	"""
 	+----------------------------------+
-	|1|         2      |      1        |
+	|1|      version   |      1        |
 	+----------------------------------+
 	| Flags (8) |     Length (24 bits) |
 	+----------------------------------+
@@ -126,7 +129,7 @@ class SynStream(ControlFrame):
 class SynReply(ControlFrame):
 	"""
 	+----------------------------------+
-	|1|         2      |      2        |
+	|1|      version   |      2        |
 	+----------------------------------+
 	| Flags (8) |     Length (24 bits) |
 	+----------------------------------+
@@ -157,7 +160,7 @@ class SynReply(ControlFrame):
 class Headers(ControlFrame):
 	"""
 	+----------------------------------+
-	|1|         2      |      8        |
+	|1|      version   |      8        |
 	+----------------------------------+
 	| Flags (8) |     Length (24 bits) |
 	+----------------------------------+
@@ -187,7 +190,7 @@ class Headers(ControlFrame):
 class RstStream(ControlFrame):
 	"""
 	+----------------------------------+
-	|1|         2      |      3        |
+	|1|      version   |      3        |
 	+----------------------------------+
 	| Flags (8) |     Length (24 bits) |
 	+----------------------------------+
@@ -213,7 +216,7 @@ class RstStream(ControlFrame):
 class Ping(ControlFrame):
 	"""
 	+----------------------------------+
-	|1|         2      |      6        |
+	|1|      version   |      6        |
 	+----------------------------------+
 	| Flags (8) |     Length (24 bits) |
 	+----------------------------------+
@@ -235,7 +238,7 @@ class Ping(ControlFrame):
 class Goaway(ControlFrame):
 	"""
 	+----------------------------------+
-	|1|         2      |      7        |
+	|1|      version   |      7        |
 	+----------------------------------+
 	| Flags (8) |     Length (24 bits) |
 	+----------------------------------+
@@ -254,6 +257,30 @@ class Goaway(ControlFrame):
 	def __repr__(self):
 		return 'GET THE FUCK OUT'
 
+class WindowUpdate(ControlFrame):
+	"""
+	+----------------------------------+
+	|1|   version    |         9       |
+	+----------------------------------+
+	| 0 (flags) |     8 (length)       |
+	+----------------------------------+
+	|X|     Stream-ID (31-bits)        |
+	+----------------------------------+
+	|X|  Delta-Window-Size (31-bits)   |
+	+----------------------------------+
+	"""
+	
+	definition = [
+		(False, 1), ('stream_id', 31),
+		(False, 1), ('delta_window_size', 31)
+
+	def __init__(self, stream_id, delta_window_size, flags=0, version=DEFAULT_VERSION):
+		if version < 3:
+			raise InvalidFrameError("WINDOW_UPDATE only exists in spdy/3 and greater")
+
+		super(WindowUpdate, self).__init__(WINDOW_UPDATE, 0, version))
+		self.stream_id = stream_id
+		self.delta_window_size = delta_window_size
 
 FRAME_TYPES = {
 	SYN_STREAM: SynStream,
@@ -264,4 +291,5 @@ FRAME_TYPES = {
 	PING: Ping,
 	GOAWAY: Goaway,
 	HEADERS: Headers
+	WINDOW_UPDATE: WindowUpdate
 }
