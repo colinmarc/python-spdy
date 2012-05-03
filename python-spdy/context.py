@@ -146,7 +146,7 @@ class Context(object):
 				'flags': flags
 			}
 
-			for key, num_bits in frame_cls.definition:
+			for key, num_bits in frame_cls.definition(spdy_version):
 				if not key:
 					bits = bits[num_bits:]
 					continue
@@ -235,7 +235,7 @@ class Context(object):
 			out.append(frame.flags)
 
 			bits = bitarray()
-			for key, num_bits in frame.definition:
+			for key, num_bits in frame.definition(self.version):
 
 				if not key:
 					zeroes = bitarray(num_bits)

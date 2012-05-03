@@ -11,18 +11,6 @@ GOAWAY = 7
 HEADERS = 8
 WINDOW_UPDATE = 9
 
-FRAME_TYPES = {
-	SYN_STREAM: SynStream,
-	SYN_REPLY: SynReply,
-	RST_STREAM: RstStream,
-#	4: Settings, #TODO
-#	5: Noop,
-	PING: Ping,
-	GOAWAY: Goaway,
-	HEADERS: Headers
-	WINDOW_UPDATE: WindowUpdate
-}
-
 PROTOCOL_ERROR = 1
 INVALID_STREAM = 2
 REFUSED_STREAM = 3
@@ -100,6 +88,10 @@ class ControlFrame(Frame):
 	def __repr__(self):
 		return '? CTRL'
 
+	@classmethod
+	def definition(cls, version=DEFAULT_VERSION):
+		return cls._definition
+
 class SynStream(ControlFrame):
 	"""
 	+----------------------------------+
@@ -117,13 +109,23 @@ class SynStream(ControlFrame):
 	|               ...                |
 	+----------------------------------+
 	"""
-	
-	definition = [
-		(False, 1), ('stream_id', 31),
-		(False, 1), ('assoc_stream_id', 31),
-		('priority', 2), (False, 5), ('slot', 8),
-		('headers', -1)
-	]
+		
+	@staticmethod
+	def definition(version=DEFAULT_VERSION):
+		if version == 2:
+			return [
+				(False, 1), ('stream_id', 31),
+				(False, 1), ('assoc_stream_id', 31),
+				('priority', 2), (False, 14),
+				('headers', -1)
+			]
+		else:
+			return [
+				(False, 1), ('stream_id', 31),
+				(False, 1), ('assoc_stream_id', 31),
+				('priority', 3), (False, 5), ('slot', 8),
+				('headers', -1)
+			]
 
 	def __init__(self, stream_id, headers, priority=0, assoc_stream_id=0, slot=0, flags=FLAG_FIN, version=DEFAULT_VERSION):
 		super(SynStream, self).__init__(SYN_STREAM, flags, version)
@@ -132,7 +134,7 @@ class SynStream(ControlFrame):
 		self.headers = headers
 		self.priority = priority
 		self.slot = slot
-		self.flags = flags
+
 		self.fin = (flags & FLAG_FIN == FLAG_FIN)
 		self.unidirectional = (flags & FLAG_UNID == FLAG_UNID)
 
@@ -155,7 +157,7 @@ class SynReply(ControlFrame):
 	+----------------------------------+
 	"""
 	
-	definition = [
+	_definition = [
 		(False, 1), ('stream_id', 31),
 		(False, 16),
 		('headers', -1)
@@ -186,7 +188,7 @@ class Headers(ControlFrame):
 	+----------------------------------+
 	"""
 	
-	definition = [
+	_definition = [
 		(False, 1), ('stream_id', 31),
 		(False, 16),
 		('headers', -1)
@@ -213,7 +215,7 @@ class RstStream(ControlFrame):
 	+----------------------------------+
 	"""
 	
-	definition = [
+	_definition = [
 		(False, 1), ('stream_id', 31),
 		('error_code', 32)
 	]
@@ -237,7 +239,7 @@ class Ping(ControlFrame):
 	+----------------------------------+
 	"""
 	
-	definition = [
+	_definition = [
 		('uniq_id', 32)
 	]
 
@@ -259,7 +261,7 @@ class Goaway(ControlFrame):
 	+----------------------------------+
 	"""
 	
-	definition = [
+	_definition = [
 		('last_stream_id', 32)
 	]
 	
@@ -283,15 +285,28 @@ class WindowUpdate(ControlFrame):
 	+----------------------------------+
 	"""
 	
-	definition = [
+	_definition = [
 		(False, 1), ('stream_id', 31),
 		(False, 1), ('delta_window_size', 31)
+	]
 
 	def __init__(self, stream_id, delta_window_size, flags=0, version=DEFAULT_VERSION):
 		if version < 3:
 			raise InvalidFrameError("WINDOW_UPDATE only exists in spdy/3 and greater")
 
-		super(WindowUpdate, self).__init__(WINDOW_UPDATE, 0, version))
+		super(WindowUpdate, self).__init__(WINDOW_UPDATE, 0, version)
 		self.stream_id = stream_id
 		self.delta_window_size = delta_window_size
+
+FRAME_TYPES = {
+	SYN_STREAM: SynStream,
+	SYN_REPLY: SynReply,
+	RST_STREAM: RstStream,
+#	4: Settings, #TODO
+#	5: Noop,
+	PING: Ping,
+	GOAWAY: Goaway,
+	HEADERS: Headers,
+	WINDOW_UPDATE: WindowUpdate
+}
 
