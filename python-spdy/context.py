@@ -25,8 +25,8 @@ class Context(object):
 			raise NotImplementedError()
 		self.version = version
 
-		self.deflater = Deflater()
-		self.inflater = Inflater()
+		self.deflater = Deflater(version)
+		self.inflater = Inflater(version)
 		self.frame_queue = []
 		self.input_buffer = bytearray()
 
@@ -71,15 +71,17 @@ class Context(object):
 		return out
 
 	def _parse_header_chunk(self, compressed_data, version):
+		print(compressed_data)
 		chunk = self.inflater.decompress(compressed_data)
 		length_size = 2 if version == 2 else 4	
+		print(length_size)
 		headers = {}
 
 		#first two bytes: number of pairs
-		num_values = int.from_bytes(chunk[0:2], 'big')	
+		num_values = int.from_bytes(chunk[0:length_size], 'big')	
 
 		#after that...
-		cursor = 2
+		cursor = length_size
 		for _ in range(num_values):
 			#two/four bytes: length of name
 			name_length = int.from_bytes(chunk[cursor:cursor+length_size], 'big')
