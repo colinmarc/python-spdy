@@ -71,10 +71,8 @@ class Context(object):
 		return out
 
 	def _parse_header_chunk(self, compressed_data, version):
-		print(compressed_data)
 		chunk = self.inflater.decompress(compressed_data)
 		length_size = 2 if version == 2 else 4	
-		print(length_size)
 		headers = {}
 
 		#first two bytes: number of pairs
