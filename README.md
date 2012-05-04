@@ -29,7 +29,7 @@ usage
 	
 		outgoing = context.outgoing()
 		if outgoing:
-			sock.sendall(context.outgoing())	
+			sock.sendall(outgoing)	
 
 installation
 ------------
