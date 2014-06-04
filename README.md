@@ -1,6 +1,8 @@
 python-spdy
 ==========
 
+**note: this was built for spdy/2, and I've since abandoned the project.**
+
 python-spdy is a simple spdy parser/(de)muxer for python >= 2.7 (including 3.x).
 
 usage
